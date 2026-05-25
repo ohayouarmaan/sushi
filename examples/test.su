@@ -1,0 +1,10 @@
+extern printf;
+
+function printTwoNumbers(int num1, int num2) : int {
+    printf("%d and %d", num1, num2);
+}
+
+
+function main() {
+    printTwoNumbers(4, 5);
+}
