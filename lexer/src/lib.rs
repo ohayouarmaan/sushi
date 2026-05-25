@@ -15,7 +15,21 @@ pub enum TokenType {
     NumberInt,
     NumberFloat,
     SemiColon,
-    Dot
+    Dot,
+    At,
+    Hash,
+    Ampersand,
+    AmpersandAmpersand,
+    Star,
+    StarStar,
+    Plus,
+    PlusPlus,
+    Minus,
+    MinusMinus,
+    Slash,
+    SlashSlash,
+    Percent,
+    Colon
 }
 
 #[derive(Debug, Clone)]
@@ -63,53 +77,39 @@ impl Lexer {
         }
     }
 
+    fn peek(&mut self) -> char {
+        if self.current_position < self.source_code.len() - 1 {
+            return self.source_code.as_bytes()[self.current_position + 1] as char;
+        }
+        panic!("Can't peek");
+    }
+
     fn get_current_character(&self) -> char {
         self.source_code.as_bytes()[self.current_position] as char
     }
 
-    fn generate_single_letter_token(&mut self, current_char: &char) -> Option<Token> {
+    fn generate_single_character_token(&mut self) -> Option<Token> {
         let lexeme_start = self.current_position;
+        let current_character = self.get_current_character();
         self.advance();
         let lexeme_end = self.current_position;
-        match current_char {
-            '{' => Some(Token {
-                lexeme_end,
-                lexeme_start,
-                tt: TokenType::LBrace,
-                lexeme: "{".into()
-            }),
-            '}' => Some(Token {
-                lexeme_end,
-                lexeme_start,
-                tt: TokenType::RBrace,
-                lexeme: "}".into()
-            }),
-            '(' => Some(Token {
-                lexeme_end,
-                lexeme_start,
-                tt: TokenType::LParen,
-                lexeme: "}".into()
-            }),
-            ')' => Some(Token {
-                lexeme_end,
-                lexeme_start,
-                tt: TokenType::RParen,
-                lexeme: "}".into()
-            }),
-            '.' => Some(Token {
-                lexeme_end,
-                lexeme_start,
-                tt: TokenType::Dot,
-                lexeme: ".".into()
-            }),
-            ';' => Some(Token {
-                lexeme_end,
-                lexeme_start,
-                tt: TokenType::SemiColon,
-                lexeme: ";".into()
-            }),
-            _ => {
+        match current_character {
+            '{' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LBrace, lexeme: "{".into() }),
+            '}' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RBrace, lexeme: "}".into() }),
+            '(' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LParen, lexeme: "}".into() }),
+            ')' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RParen, lexeme: "}".into() }),
+            '.' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::Dot, lexeme: ".".into() }),
+            ';' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::SemiColon, lexeme: ";".into() }),
+            '*' => Some(Token { tt: TokenType::Star, lexeme_start, lexeme_end, lexeme: "*".into() }),
+            '/' => Some(Token { tt: TokenType::Slash, lexeme_start, lexeme_end, lexeme: "/".into() }),
+            '+' => Some(Token { tt: TokenType::Plus, lexeme_start, lexeme_end, lexeme: "+".into() }),
+            '-' => Some(Token { tt: TokenType::Minus, lexeme_start, lexeme_end, lexeme: "-".into() }),
+            '&' => Some(Token { tt: TokenType::Ampersand, lexeme_start, lexeme_end, lexeme: "&".into() }),
+            ':' => Some(Token { tt: TokenType::Colon, lexeme_start, lexeme_end, lexeme: ":".into() }),
+            '%' => Some(Token { tt: TokenType::Percent, lexeme_start, lexeme_end, lexeme: "%".into() }),
+            c => {
                 self.current_position -= 1;
+                dbg!(c);
                 unreachable!("INVALID PUNCTUATION");
             }
         }
@@ -138,6 +138,26 @@ impl Lexer {
             Ok(Token { tt: TokenType::NumberInt, lexeme_start, lexeme_end, lexeme: num_start })
         } else {
             Ok(Token { tt: TokenType::NumberFloat, lexeme_start, lexeme_end, lexeme: num_start })
+        }
+    }
+
+    fn generate_character_token(&mut self) -> Option<Token> {
+        let lexeme_start = self.current_position;
+        let current_character = self.get_current_character();
+        if self.peek() == current_character {
+            self.advance();
+            let lexeme_end = self.current_position;
+            self.advance();
+            match current_character {
+                '*' => Some(Token { tt: TokenType::StarStar, lexeme_start, lexeme_end, lexeme: "**".into() }),
+                '/' => Some(Token { tt: TokenType::SlashSlash, lexeme_start, lexeme_end, lexeme: "//".into() }),
+                '+' => Some(Token { tt: TokenType::PlusPlus, lexeme_start, lexeme_end, lexeme: "++".into() }),
+                '-' => Some(Token { tt: TokenType::MinusMinus, lexeme_start, lexeme_end, lexeme: "--".into() }),
+                '&' => Some(Token { tt: TokenType::AmpersandAmpersand, lexeme_start, lexeme_end, lexeme: "&&".into() }),
+                _ => unreachable!("Invalid Character")
+            }
+        } else {
+            self.generate_single_character_token()
         }
     }
 
@@ -176,8 +196,8 @@ impl Lexer {
                     }
                 }
 
-                c if ['{', '}', '(', ')', ';', '.'].contains(&c) => {
-                    if let Some(t) = self.generate_single_letter_token(&c) {
+                c if ['{', '}', '(', ')', ';', '.', '*', '/', '+', '-', '&', '%', '#', '@', ':'].contains(&c) => {
+                    if let Some(t) = self.generate_character_token() {
                         self.tokens.push(t);
                     }
                 }
@@ -185,7 +205,7 @@ impl Lexer {
                 c if IGNORE.contains(&c) => {
                     if c == '\n' {
                         self.current_row += 1;
-                        self.current_column = 0;
+                        self.current_column = 1;
                     }
                     self.advance();
                     continue;
