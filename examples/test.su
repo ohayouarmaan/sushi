@@ -6,5 +6,5 @@ function printTwoNumbers(int num1, int num2) : int {
 
 
 function main() {
-    printTwoNumbers(4, 5);
+    printTwoNumbers(4.2, 5);
 }

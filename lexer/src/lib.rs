@@ -1,4 +1,4 @@
-use anyhow::{Result};
+use anyhow::{Result, anyhow};
 
 static IGNORE: &[char] = &['\n', '\t'];
 
@@ -12,6 +12,10 @@ pub enum TokenType {
     RBrace,
     LParen,
     RParen,
+    NumberInt,
+    NumberFloat,
+    SemiColon,
+    Dot
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +31,8 @@ pub struct Lexer {
     pub source_code: String,
     pub tokens: Vec<Token>,
     pub current_position: usize,
+    pub current_row: usize,
+    pub current_column: usize,
 }
 
 impl Lexer {
@@ -34,7 +40,9 @@ impl Lexer {
         Self {
             source_code,
             tokens: Vec::new(),
-            current_position: 0
+            current_position: 0,
+            current_row: 1,
+            current_column: 0,
         }
     }
 
@@ -51,10 +59,15 @@ impl Lexer {
     fn advance(&mut self) {
         if self.current_position < self.source_code.len() - 1 {
             self.current_position += 1;
+            self.current_column += 1;
         }
     }
 
-    fn generate_punctuation_token(&mut self, current_char: &char) -> Option<Token> {
+    fn get_current_character(&self) -> char {
+        self.source_code.as_bytes()[self.current_position] as char
+    }
+
+    fn generate_single_letter_token(&mut self, current_char: &char) -> Option<Token> {
         let lexeme_start = self.current_position;
         self.advance();
         let lexeme_end = self.current_position;
@@ -83,6 +96,18 @@ impl Lexer {
                 tt: TokenType::RParen,
                 lexeme: "}".into()
             }),
+            '.' => Some(Token {
+                lexeme_end,
+                lexeme_start,
+                tt: TokenType::Dot,
+                lexeme: ".".into()
+            }),
+            ';' => Some(Token {
+                lexeme_end,
+                lexeme_start,
+                tt: TokenType::SemiColon,
+                lexeme: ";".into()
+            }),
             _ => {
                 self.current_position -= 1;
                 unreachable!("INVALID PUNCTUATION");
@@ -90,11 +115,37 @@ impl Lexer {
         }
     }
 
+    fn generate_numbers(&mut self) -> Result<Token> {
+        let mut num_start = String::new();
+        let lexeme_start = self.current_position;
+        let mut dot_count = 0;
+        while ['_', '.'].contains(&self.get_current_character()) || self.get_current_character().is_ascii_digit() {
+            if self.get_current_character() != '_' {
+                num_start.push(self.get_current_character());
+            }
+            if self.get_current_character() == '.'{
+                dot_count += 1;
+                if dot_count > 1 {
+                    return Err(anyhow!("Multiple dots. {:?}:{:?}", self.current_row, self.current_column));
+                }
+            }
+            self.advance();
+        }
+
+        let lexeme_end = self.current_position;
+
+        if dot_count == 0 {
+            Ok(Token { tt: TokenType::NumberInt, lexeme_start, lexeme_end, lexeme: num_start })
+        } else {
+            Ok(Token { tt: TokenType::NumberFloat, lexeme_start, lexeme_end, lexeme: num_start })
+        }
+    }
+
     pub fn lex(&mut self) -> Result<()> {
         let source_code = self.source_code.clone();
         let src = source_code.as_bytes();
         while self.current_position < (self.source_code.len() - 1) {
-            let mut current_char = src[self.current_position] as char;
+            let mut current_char = self.get_current_character();
             match current_char {
                 c if c.is_ascii_alphabetic() => {
                     let mut word = String::new();
@@ -118,14 +169,24 @@ impl Lexer {
                     }
                 }
 
-                c if ['{', '}', '(', ')'].contains(&c) => {
-                    if let Some(t) = self.generate_punctuation_token(&c) {
+                c if c.is_ascii_digit() => {
+                    match self.generate_numbers() {
+                        Ok(n) => self.tokens.push(n),
+                        Err(e) => return Err(e)
+                    }
+                }
+
+                c if ['{', '}', '(', ')', ';', '.'].contains(&c) => {
+                    if let Some(t) = self.generate_single_letter_token(&c) {
                         self.tokens.push(t);
-                        self.advance();
                     }
                 }
 
                 c if IGNORE.contains(&c) => {
+                    if c == '\n' {
+                        self.current_row += 1;
+                        self.current_column = 0;
+                    }
                     self.advance();
                     continue;
                 }
