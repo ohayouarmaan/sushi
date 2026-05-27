@@ -16,6 +16,7 @@ pub enum TokenType {
     NumberFloat,
     SemiColon,
     Dot,
+    DotDotDot,
     At,
     Hash,
     Ampersand,
@@ -29,7 +30,11 @@ pub enum TokenType {
     Slash,
     SlashSlash,
     Percent,
-    Colon
+    Colon,
+    Str,
+    String,
+    Identifier,
+    Comma
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +71,7 @@ impl Lexer {
             "extern" => Some(TokenType::Extern),
             "if" => Some(TokenType::If),
             "int" => Some(TokenType::Int),
+            "str" => Some(TokenType::Str),
             _ => None
         }
     }
@@ -96,8 +102,8 @@ impl Lexer {
         match current_character {
             '{' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LBrace, lexeme: "{".into() }),
             '}' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RBrace, lexeme: "}".into() }),
-            '(' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LParen, lexeme: "}".into() }),
-            ')' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RParen, lexeme: "}".into() }),
+            '(' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LParen, lexeme: "(".into() }),
+            ')' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RParen, lexeme: ")".into() }),
             '.' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::Dot, lexeme: ".".into() }),
             ';' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::SemiColon, lexeme: ";".into() }),
             '*' => Some(Token { tt: TokenType::Star, lexeme_start, lexeme_end, lexeme: "*".into() }),
@@ -107,6 +113,7 @@ impl Lexer {
             '&' => Some(Token { tt: TokenType::Ampersand, lexeme_start, lexeme_end, lexeme: "&".into() }),
             ':' => Some(Token { tt: TokenType::Colon, lexeme_start, lexeme_end, lexeme: ":".into() }),
             '%' => Some(Token { tt: TokenType::Percent, lexeme_start, lexeme_end, lexeme: "%".into() }),
+            ',' => Some(Token { tt: TokenType::Comma, lexeme_start, lexeme_end, lexeme: ",".into() }),
             c => {
                 self.current_position -= 1;
                 dbg!(c);
@@ -141,6 +148,26 @@ impl Lexer {
         }
     }
 
+    fn generate_string(&mut self) -> Result<Token> {
+        let lexeme_start = self.current_position;
+        let string_starter = self.get_current_character();
+        let mut string_value = String::new();
+        self.advance();
+        while self.get_current_character() != string_starter {
+            if ['\n'].contains(&self.get_current_character()) {
+                return Err(anyhow!("String ended with no termination {}:{}", self.current_row, self.current_position));
+            };
+            if self.get_current_character() == '\\' {
+                self.advance();
+            }
+            string_value.push(self.get_current_character());
+            self.advance();
+        }
+        let lexeme_end = self.current_position;
+        self.advance();
+        Ok(Token { tt: TokenType::String, lexeme_start, lexeme_end, lexeme: string_value })
+    }
+
     fn generate_character_token(&mut self) -> Option<Token> {
         let lexeme_start = self.current_position;
         let current_character = self.get_current_character();
@@ -154,12 +181,21 @@ impl Lexer {
                 '+' => Some(Token { tt: TokenType::PlusPlus, lexeme_start, lexeme_end, lexeme: "++".into() }),
                 '-' => Some(Token { tt: TokenType::MinusMinus, lexeme_start, lexeme_end, lexeme: "--".into() }),
                 '&' => Some(Token { tt: TokenType::AmpersandAmpersand, lexeme_start, lexeme_end, lexeme: "&&".into() }),
+                '.' => {
+                    if self.get_current_character() == current_character {
+                        self.advance();
+                        Some(Token { tt: TokenType::DotDotDot, lexeme_start, lexeme_end, lexeme: "...".into() })
+                    } else {
+                        None
+                    }
+                }
                 _ => unreachable!("Invalid Character")
             }
         } else {
             self.generate_single_character_token()
         }
     }
+
 
     pub fn lex(&mut self) -> Result<()> {
         let source_code = self.source_code.clone();
@@ -186,6 +222,8 @@ impl Lexer {
                             lexeme_start,
                             tt,
                         });
+                    } else {
+                        self.tokens.push(Token { tt: TokenType::Identifier, lexeme_start, lexeme_end: self.current_position, lexeme: word });
                     }
                 }
 
@@ -196,9 +234,16 @@ impl Lexer {
                     }
                 }
 
-                c if ['{', '}', '(', ')', ';', '.', '*', '/', '+', '-', '&', '%', '#', '@', ':'].contains(&c) => {
+                c if ['{', '}', '(', ')', ';', '.', '*', '/', '+', '-', '&', '%', '#', '@', ':', ','].contains(&c) => {
                     if let Some(t) = self.generate_character_token() {
                         self.tokens.push(t);
+                    }
+                }
+
+                c if ['"', '\''].contains(&c) => {
+                    match self.generate_string() {
+                        Ok(t) => self.tokens.push(t),
+                        Err(e) => return Err(e)
                     }
                 }
 
