@@ -123,12 +123,9 @@ impl Parser {
         precedent_function: fn(&mut Self) -> Result<Expression>) -> Result<Expression> 
     {
         let mut lhs = precedent_function(self)?;
-        dbg!(self.can_move_forward());
         while self.can_move_forward() && match_token_types.contains(&self.get_current_token().tt) {
-            println!("Acha");
             let operator = self.get_current_token().clone();
             self.advance();
-            dbg!(&match_token_types);
             let rhs = precedent_function(self)?;
             lhs = Expression::Binary { left: Box::new(lhs), operator, right: Box::new(rhs) }
         }
