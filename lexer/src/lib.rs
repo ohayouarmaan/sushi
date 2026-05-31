@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 
 static IGNORE: &[char] = &['\n', '\t'];
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     Function,
     Extern,
@@ -34,6 +34,7 @@ pub enum TokenType {
     Str,
     String,
     Identifier,
+    BangEqual,
     Comma
 }
 
@@ -42,6 +43,8 @@ pub struct Token {
     pub tt: TokenType,
     pub lexeme_start: usize,
     pub lexeme_end: usize,
+    pub column: usize,
+    pub line: usize,
     pub lexeme: String
 }
 
@@ -100,20 +103,20 @@ impl Lexer {
         self.advance();
         let lexeme_end = self.current_position;
         match current_character {
-            '{' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LBrace, lexeme: "{".into() }),
-            '}' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RBrace, lexeme: "}".into() }),
-            '(' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LParen, lexeme: "(".into() }),
-            ')' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RParen, lexeme: ")".into() }),
-            '.' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::Dot, lexeme: ".".into() }),
-            ';' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::SemiColon, lexeme: ";".into() }),
-            '*' => Some(Token { tt: TokenType::Star, lexeme_start, lexeme_end, lexeme: "*".into() }),
-            '/' => Some(Token { tt: TokenType::Slash, lexeme_start, lexeme_end, lexeme: "/".into() }),
-            '+' => Some(Token { tt: TokenType::Plus, lexeme_start, lexeme_end, lexeme: "+".into() }),
-            '-' => Some(Token { tt: TokenType::Minus, lexeme_start, lexeme_end, lexeme: "-".into() }),
-            '&' => Some(Token { tt: TokenType::Ampersand, lexeme_start, lexeme_end, lexeme: "&".into() }),
-            ':' => Some(Token { tt: TokenType::Colon, lexeme_start, lexeme_end, lexeme: ":".into() }),
-            '%' => Some(Token { tt: TokenType::Percent, lexeme_start, lexeme_end, lexeme: "%".into() }),
-            ',' => Some(Token { tt: TokenType::Comma, lexeme_start, lexeme_end, lexeme: ",".into() }),
+            '{' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LBrace, lexeme: "{".into(), column: self.current_column, line: self.current_row }),
+            '}' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RBrace, lexeme: "}".into(), column: self.current_column, line: self.current_row }),
+            '(' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LParen, lexeme: "(".into(), column: self.current_column, line: self.current_row }),
+            ')' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RParen, lexeme: ")".into(), column: self.current_column, line: self.current_row }),
+            '.' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::Dot, lexeme: ".".into(), column: self.current_column, line: self.current_row }),
+            ';' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::SemiColon, lexeme: ";".into(), column: self.current_column, line: self.current_row }),
+            '*' => Some(Token { tt: TokenType::Star, lexeme_start, lexeme_end, lexeme: "*".into(), column: self.current_column, line: self.current_row }),
+            '/' => Some(Token { tt: TokenType::Slash, lexeme_start, lexeme_end, lexeme: "/".into(), column: self.current_column, line: self.current_row }),
+            '+' => Some(Token { tt: TokenType::Plus, lexeme_start, lexeme_end, lexeme: "+".into(), column: self.current_column, line: self.current_row }),
+            '-' => Some(Token { tt: TokenType::Minus, lexeme_start, lexeme_end, lexeme: "-".into(), column: self.current_column, line: self.current_row }),
+            '&' => Some(Token { tt: TokenType::Ampersand, lexeme_start, lexeme_end, lexeme: "&".into(), column: self.current_column, line: self.current_row }),
+            ':' => Some(Token { tt: TokenType::Colon, lexeme_start, lexeme_end, lexeme: ":".into(), column: self.current_column, line: self.current_row }),
+            '%' => Some(Token { tt: TokenType::Percent, lexeme_start, lexeme_end, lexeme: "%".into(), column: self.current_column, line: self.current_row }),
+            ',' => Some(Token { tt: TokenType::Comma, lexeme_start, lexeme_end, lexeme: ",".into(), column: self.current_column, line: self.current_row }),
             c => {
                 self.current_position -= 1;
                 dbg!(c);
@@ -142,9 +145,9 @@ impl Lexer {
         let lexeme_end = self.current_position;
 
         if dot_count == 0 {
-            Ok(Token { tt: TokenType::NumberInt, lexeme_start, lexeme_end, lexeme: num_start })
+            Ok(Token { tt: TokenType::NumberInt, lexeme_start, lexeme_end, lexeme: num_start, column: self.current_column, line: self.current_row })
         } else {
-            Ok(Token { tt: TokenType::NumberFloat, lexeme_start, lexeme_end, lexeme: num_start })
+            Ok(Token { tt: TokenType::NumberFloat, lexeme_start, lexeme_end, lexeme: num_start, column: self.current_column, line: self.current_row })
         }
     }
 
@@ -165,7 +168,7 @@ impl Lexer {
         }
         let lexeme_end = self.current_position;
         self.advance();
-        Ok(Token { tt: TokenType::String, lexeme_start, lexeme_end, lexeme: string_value })
+        Ok(Token { tt: TokenType::String, lexeme_start, lexeme_end, lexeme: string_value, column: self.current_column, line: self.current_row })
     }
 
     fn generate_character_token(&mut self) -> Option<Token> {
@@ -176,15 +179,15 @@ impl Lexer {
             let lexeme_end = self.current_position;
             self.advance();
             match current_character {
-                '*' => Some(Token { tt: TokenType::StarStar, lexeme_start, lexeme_end, lexeme: "**".into() }),
-                '/' => Some(Token { tt: TokenType::SlashSlash, lexeme_start, lexeme_end, lexeme: "//".into() }),
-                '+' => Some(Token { tt: TokenType::PlusPlus, lexeme_start, lexeme_end, lexeme: "++".into() }),
-                '-' => Some(Token { tt: TokenType::MinusMinus, lexeme_start, lexeme_end, lexeme: "--".into() }),
-                '&' => Some(Token { tt: TokenType::AmpersandAmpersand, lexeme_start, lexeme_end, lexeme: "&&".into() }),
+                '*' => Some(Token { tt: TokenType::StarStar, lexeme_start, lexeme_end, lexeme: "**".into(), column: self.current_column, line: self.current_row }),
+                '/' => Some(Token { tt: TokenType::SlashSlash, lexeme_start, lexeme_end, lexeme: "//".into(), column: self.current_column, line: self.current_row }),
+                '+' => Some(Token { tt: TokenType::PlusPlus, lexeme_start, lexeme_end, lexeme: "++".into(), column: self.current_column, line: self.current_row }),
+                '-' => Some(Token { tt: TokenType::MinusMinus, lexeme_start, lexeme_end, lexeme: "--".into(), column: self.current_column, line: self.current_row }),
+                '&' => Some(Token { tt: TokenType::AmpersandAmpersand, lexeme_start, lexeme_end, lexeme: "&&".into(), column: self.current_column, line: self.current_row }),
                 '.' => {
                     if self.get_current_character() == current_character {
                         self.advance();
-                        Some(Token { tt: TokenType::DotDotDot, lexeme_start, lexeme_end, lexeme: "...".into() })
+                        Some(Token { tt: TokenType::DotDotDot, lexeme_start, lexeme_end, lexeme: "...".into(), column: self.current_column, line: self.current_row })
                     } else {
                         None
                     }
@@ -192,6 +195,12 @@ impl Lexer {
                 _ => unreachable!("Invalid Character")
             }
         } else {
+            if current_character == '!' && self.peek() == '=' {
+                self.advance();
+                let lexeme_end = self.current_position;
+                self.advance();
+                return Some(Token { tt: TokenType::BangEqual, lexeme_start, lexeme_end, lexeme: "!=".into(), column: self.current_column, line: self.current_row })
+            }
             self.generate_single_character_token()
         }
     }
@@ -221,9 +230,11 @@ impl Lexer {
                             lexeme_end: self.current_position,
                             lexeme_start,
                             tt,
+                            column: self.current_column,
+                            line: self.current_row
                         });
                     } else {
-                        self.tokens.push(Token { tt: TokenType::Identifier, lexeme_start, lexeme_end: self.current_position, lexeme: word });
+                        self.tokens.push(Token { tt: TokenType::Identifier, lexeme_start, lexeme_end: self.current_position, lexeme: word, column: self.current_column, line: self.current_row });
                     }
                 }
 

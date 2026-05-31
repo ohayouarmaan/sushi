@@ -1,7 +1,8 @@
 [workspace]
 members = [
     ".",
-    "lexer"
+    "lexer",
+    "parser"
 ]
 resolvers = "2"
 
@@ -12,6 +13,7 @@ edition = "2024"
 
 [dependencies]
 lexer = { path = "./lexer" }
+parser = { path = "./parser" }
 anyhow = { workspace = true }
 
 [workspace.dependencies]

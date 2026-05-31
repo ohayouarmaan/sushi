@@ -16,9 +16,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "parser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lexer",
+]
+
+[[package]]
 name = "sushi"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "lexer",
+ "parser",
 ]
