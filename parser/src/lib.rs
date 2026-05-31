@@ -51,6 +51,23 @@ impl Parser {
         }
     }
 
+    fn can_move_forward(&self) -> bool {
+        self.current_index < self.tokens.len()
+    }
+
+    fn consume(&mut self, tt: TokenType) -> Result<()> {
+        if self.can_move_forward() {
+            if self.get_current_token().tt == tt {
+                self.advance();
+                Ok(())
+            } else {
+                Err(anyhow!("Expected {:?} found {:?}", tt, self.get_current_token()))
+            }
+        } else {
+            Err(anyhow!("Expected {:?} found EOF", tt))
+        }
+    }
+
     fn get_current_token(&self) -> &Token {
         &self.tokens[self.current_index]
     }
@@ -78,7 +95,9 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Result<Expression> {
-        self.parse_term()
+        let res = self.parse_term();
+        self.consume(TokenType::SemiColon)?;
+        res
     }
 
 
@@ -100,15 +119,16 @@ impl Parser {
     }
 
     fn create_binary_expression(&mut self, 
-        match_token_types: &[TokenType], 
+        match_token_types: &[TokenType],
         precedent_function: fn(&mut Self) -> Result<Expression>) -> Result<Expression> 
     {
         let mut lhs = precedent_function(self)?;
-
-        while match_token_types.contains(&self.get_current_token().tt) {
+        dbg!(self.can_move_forward());
+        while self.can_move_forward() && match_token_types.contains(&self.get_current_token().tt) {
+            println!("Acha");
             let operator = self.get_current_token().clone();
             self.advance();
-
+            dbg!(&match_token_types);
             let rhs = precedent_function(self)?;
             lhs = Expression::Binary { left: Box::new(lhs), operator, right: Box::new(rhs) }
         }
