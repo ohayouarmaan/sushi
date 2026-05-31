@@ -2,10 +2,25 @@ use std::fs;
 use anyhow::{Context, Result};
 use ir::IRGenerator;
 use lexer::Lexer;
+use argh::FromArgs;
 use parser::Parser;
 
+#[derive(FromArgs)]
+/// Run sushi
+pub struct Options {
+
+    #[argh(option)]
+    /// file path(input)
+    input: String,
+
+    #[argh(option, short = 'd')]
+    /// path to dump the ir
+    dump_ir: String
+}
+
 fn main() -> Result<()> {
-    let source_code = fs::read_to_string("./examples/test.su").context("File probably does not exist")?;
+    let opts: Options = argh::from_env();
+    let source_code = fs::read_to_string(opts.input).context("File probably does not exist")?;
     let mut l = Lexer::new(source_code);
     l.lex()?;
     let mut p = Parser::new(l.tokens);
@@ -13,7 +28,13 @@ fn main() -> Result<()> {
         Ok(_) => {
             let mut ir = IRGenerator::new(p.statements.expect("UNREACHABLE"));
             ir.generate();
-            println!("{:?}", ir.instructions);
+            let mut insts = String::new();
+            for instr in ir.instructions {
+                println!("{}", instr);
+                insts.push_str(&instr.to_string());
+                insts.push('\n');
+            }
+            fs::write(opts.dump_ir, insts)?;
         }
         Err(e) => {
             println!("Error: {:?}", e);

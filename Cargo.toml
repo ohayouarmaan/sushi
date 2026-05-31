@@ -16,6 +16,8 @@ lexer = { path = "./lexer" }
 parser = { path = "./parser" }
 ir = { path = "./ir" }
 anyhow = { workspace = true }
+argh = "0.1.19"
 
 [workspace.dependencies]
 anyhow = "1.0.102"
+argh = "0.1.19"

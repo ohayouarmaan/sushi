@@ -1,8 +1,61 @@
+use std::fmt::Display;
 use lexer::TokenType;
 use parser::{Literal, Statement, Expression};
 
+macro_rules! InstructionSet {
+    (
+        $(
+            $name: ident {
+                $( $field: ident: $ty: ty ),*
+            }
+        ),* $(,)?
+    ) => {
+        #[derive(Debug)]
+        pub enum Instruction {
+            $(
+                $name {
+                    $( $field: $ty ),*
+                }
+            ), *
+        }
+
+        impl std::fmt::Display for Instruction {
+            fn fmt(
+                &self,
+                f: &mut std::fmt::Formatter<'_>
+            ) -> std::fmt::Result {
+                match self {
+                    $(
+                        Instruction::$name { $( $field ),* } => {
+                            write!(f, stringify!($name))?;
+
+                            $(
+                                write!(f, " {}", $field)?;
+                            )*
+
+                                Ok(())
+                        }
+                    ),*
+                }
+            }
+
+        }
+    }
+}
+
+
+
 #[derive(Debug)]
-pub enum Instruction {
+pub struct Temp(pub usize);
+
+impl Display for Temp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "t{}", self.0)
+    }
+}
+
+
+InstructionSet! {
     LoadImmediate {
         literal: Literal,
         dst: usize
