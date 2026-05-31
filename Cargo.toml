@@ -14,6 +14,7 @@ edition = "2024"
 [dependencies]
 lexer = { path = "./lexer" }
 parser = { path = "./parser" }
+ir = { path = "./ir" }
 anyhow = { workspace = true }
 
 [workspace.dependencies]

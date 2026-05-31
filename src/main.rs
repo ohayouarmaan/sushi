@@ -1,5 +1,6 @@
 use std::fs;
 use anyhow::{Context, Result};
+use ir::IRGenerator;
 use lexer::Lexer;
 use parser::Parser;
 
@@ -10,7 +11,9 @@ fn main() -> Result<()> {
     let mut p = Parser::new(l.tokens);
     match p.parse() {
         Ok(_) => {
-            println!("Parser: {:?}", p.statements);
+            let mut ir = IRGenerator::new(p.statements.expect("UNREACHABLE"));
+            ir.generate();
+            println!("{:?}", ir.instructions);
         }
         Err(e) => {
             println!("Error: {:?}", e);

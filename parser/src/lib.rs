@@ -2,12 +2,12 @@ use lexer::{Token, TokenType};
 use anyhow::{Result, anyhow};
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     NumberInt(u64)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Binary {
         left: Box<Expression>,
@@ -17,7 +17,7 @@ pub enum Expression {
     Literal(Literal)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Expression(Expression)
 }
