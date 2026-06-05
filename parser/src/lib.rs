@@ -29,7 +29,8 @@ pub enum Expression {
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Expression(Expression)
+    Expression(Expression),
+    PrintStatement(Expression)
 }
 
 #[derive(Debug)]
@@ -95,12 +96,19 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Statement> {
-        //! RIGHT NOW IT WILL JUST BE AN EXPRESSION BECAUSE WE DON'T HAVE ANY OTHER STATEMENT
-        //! DEFINED
-        
-        match self.parse_expression() {
-            Ok(expression) => Ok(Statement::Expression(expression)),
-            Err(e) => Err(e)
+        let current_token = self.get_current_token();
+        match current_token.tt {
+            TokenType::Print => {
+                self.advance();
+                let exp = self.parse_expression()?;
+                Ok(Statement::PrintStatement(exp))
+            }
+            _ => {
+                match self.parse_expression() {
+                    Ok(expression) => Ok(Statement::Expression(expression)),
+                    Err(e) => Err(e)
+                }
+            }
         }
     }
 

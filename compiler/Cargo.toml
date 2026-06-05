@@ -1,0 +1,9 @@
+[package]
+name = "compiler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ir = { path = "../ir" }
+parser = { path = "../parser" }
+anyhow = { workspace = true }

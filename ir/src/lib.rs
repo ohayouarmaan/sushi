@@ -10,7 +10,7 @@ macro_rules! InstructionSet {
             }
         ),* $(,)?
     ) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum Instruction {
             $(
                 $name {
@@ -45,7 +45,7 @@ macro_rules! InstructionSet {
 
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Temp(pub usize);
 
 impl Display for Temp {
@@ -58,12 +58,30 @@ impl Display for Temp {
 InstructionSet! {
     LoadImmediate {
         literal: Literal,
-        dst: usize
+        dst: Temp
     },
     Add {
-        left: usize,
-        right: usize,
-        dst: usize
+        left: Temp,
+        right: Temp,
+        dst: Temp
+    },
+    Subtract {
+        left: Temp,
+        right: Temp,
+        dst: Temp
+    },
+    Multiply {
+        left: Temp,
+        right: Temp,
+        dst: Temp
+    },
+    Divide {
+        left: Temp,
+        right: Temp,
+        dst: Temp
+    },
+    Print {
+        dst: Temp
     }
 }
 
@@ -106,7 +124,8 @@ impl IRGenerator {
         match stmt {
             Statement::Expression(e) => {
                 self.generate_expression(&e);
-            }
+            },
+            Statement::PrintStatement(e) => self.generate_print_statement(&e),
         }
     }
 
@@ -114,13 +133,18 @@ impl IRGenerator {
         self.lower_expression(e);
     }
 
-    fn generate_new_temp(&mut self) -> usize {
-        let t = self.temp_counter;
-        self.temp_counter += 1;
-        t
+    fn generate_print_statement(&mut self, e: &Expression) {
+        let lowered_expr = self.lower_expression(e);
+        self.instructions.push(Instruction::Print { dst: lowered_expr });
     }
 
-    fn lower_expression(&mut self, e: &Expression) -> usize {
+    fn generate_new_temp(&mut self) -> Temp {
+        let t = self.temp_counter;
+        self.temp_counter += 1;
+        Temp(t)
+    }
+
+    fn lower_expression(&mut self, e: &Expression) -> Temp {
         match e {
             parser::Expression::Binary { left, operator, right } => {
                 let left = self.lower_expression(left);
@@ -128,7 +152,22 @@ impl IRGenerator {
                 match operator.tt {
                     TokenType::Plus => {
                         let dst = self.generate_new_temp();
-                        self.instructions.push(Instruction::Add { left, right, dst });
+                        self.instructions.push(Instruction::Add { left, right, dst: dst.clone() });
+                        dst
+                    },
+                    TokenType::Star => {
+                        let dst = self.generate_new_temp();
+                        self.instructions.push(Instruction::Multiply { left, right, dst: dst.clone() });
+                        dst
+                    },
+                    TokenType::Slash => {
+                        let dst = self.generate_new_temp();
+                        self.instructions.push(Instruction::Divide { left, right, dst: dst.clone() });
+                        dst
+                    },
+                    TokenType::Minus => {
+                        let dst = self.generate_new_temp();
+                        self.instructions.push(Instruction::Subtract { left, right, dst: dst.clone() });
                         dst
                     },
                     _ => {
@@ -140,7 +179,7 @@ impl IRGenerator {
                 match literal {
                     Literal::NumberInt(_) => {
                         let dst = self.generate_new_temp();
-                        self.instructions.push(Instruction::LoadImmediate { literal: literal.clone(), dst });
+                        self.instructions.push(Instruction::LoadImmediate { literal: literal.clone(), dst: dst.clone() });
                         dst
                     }
                 }

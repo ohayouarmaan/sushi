@@ -15,7 +15,7 @@ pub struct Options {
 
     #[argh(option, short = 'd')]
     /// path to dump the ir
-    dump_ir: String
+    dump_ir: Option<String>
 }
 
 fn main() -> Result<()> {
@@ -29,12 +29,18 @@ fn main() -> Result<()> {
             let mut ir = IRGenerator::new(p.statements.expect("UNREACHABLE"));
             ir.generate();
             let mut insts = String::new();
-            for instr in ir.instructions {
-                println!("{}", instr);
+            for instr in ir.instructions.iter().clone() {
+                println!("{instr}");
                 insts.push_str(&instr.to_string());
                 insts.push('\n');
             }
-            fs::write(opts.dump_ir, insts)?;
+
+            let mut c = compiler::Compiler::new(ir.instructions);
+            c.compile();
+            println!("{}", c.assembly);
+            let _ = fs::write("./examples/test.s", c.assembly);
+            if let Some(t) = opts.dump_ir { fs::write(t, insts)? };
+            
         }
         Err(e) => {
             println!("Error: {:?}", e);

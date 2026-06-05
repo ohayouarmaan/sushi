@@ -40,6 +40,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "compiler"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ir",
+ "parser",
+]
+
+[[package]]
 name = "ir"
 version = "0.1.0"
 dependencies = [
@@ -117,6 +126,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argh",
+ "compiler",
  "ir",
  "lexer",
  "parser",

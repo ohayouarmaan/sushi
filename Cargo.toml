@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    ".",
+    ".", "compiler",
     "lexer",
     "parser"
 ]
@@ -15,6 +15,7 @@ edition = "2024"
 lexer = { path = "./lexer" }
 parser = { path = "./parser" }
 ir = { path = "./ir" }
+compiler = { path = "./compiler" }
 anyhow = { workspace = true }
 argh = "0.1.19"
 

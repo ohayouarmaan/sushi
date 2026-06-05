@@ -9,6 +9,7 @@ pub enum TokenType {
     If,
     Int,
     LBrace,
+    Print,
     RBrace,
     LParen,
     RParen,
@@ -75,6 +76,7 @@ impl Lexer {
             "if" => Some(TokenType::If),
             "int" => Some(TokenType::Int),
             "str" => Some(TokenType::Str),
+            "print" => Some(TokenType::Print),
             _ => None
         }
     }
