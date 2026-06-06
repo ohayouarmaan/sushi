@@ -72,9 +72,8 @@ impl Compiler {
             }
         }
 
-        self.emit(" mov rax, 60");
         self.emit(" xor rdi, rdi");
-        self.emit(" syscall");
+        self.emit(" call exit");
         Ok(())
     }
 }

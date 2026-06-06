@@ -4,7 +4,7 @@ set -e
 
 mkdir -p build
 
-cargo run -- --input examples/test.su
+cargo run -- --input $1
 
 nasm -f elf64 examples/test.s -o build/main.o
 
