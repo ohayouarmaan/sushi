@@ -36,7 +36,10 @@ pub enum TokenType {
     String,
     Identifier,
     BangEqual,
-    Comma
+    Equal,
+    EqualEqual,
+    Comma,
+    Dec
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +80,7 @@ impl Lexer {
             "int" => Some(TokenType::Int),
             "str" => Some(TokenType::Str),
             "print" => Some(TokenType::Print),
+            "dec" => Some(TokenType::Dec),
             _ => None
         }
     }
@@ -119,6 +123,7 @@ impl Lexer {
             ':' => Some(Token { tt: TokenType::Colon, lexeme_start, lexeme_end, lexeme: ":".into(), column: self.current_column, line: self.current_row }),
             '%' => Some(Token { tt: TokenType::Percent, lexeme_start, lexeme_end, lexeme: "%".into(), column: self.current_column, line: self.current_row }),
             ',' => Some(Token { tt: TokenType::Comma, lexeme_start, lexeme_end, lexeme: ",".into(), column: self.current_column, line: self.current_row }),
+            '=' => Some(Token { tt: TokenType::Equal, lexeme_start, lexeme_end, lexeme: "=".into(), column: self.current_column, line: self.current_row }),
             c => {
                 self.current_position -= 1;
                 dbg!(c);
@@ -186,6 +191,7 @@ impl Lexer {
                 '+' => Some(Token { tt: TokenType::PlusPlus, lexeme_start, lexeme_end, lexeme: "++".into(), column: self.current_column, line: self.current_row }),
                 '-' => Some(Token { tt: TokenType::MinusMinus, lexeme_start, lexeme_end, lexeme: "--".into(), column: self.current_column, line: self.current_row }),
                 '&' => Some(Token { tt: TokenType::AmpersandAmpersand, lexeme_start, lexeme_end, lexeme: "&&".into(), column: self.current_column, line: self.current_row }),
+                '=' => Some(Token { tt: TokenType::EqualEqual, lexeme_start, lexeme_end, lexeme: "==".into(), column: self.current_column, line: self.current_row }),
                 '.' => {
                     if self.get_current_character() == current_character {
                         self.advance();
@@ -247,7 +253,7 @@ impl Lexer {
                     }
                 }
 
-                c if ['{', '}', '(', ')', ';', '.', '*', '/', '+', '-', '&', '%', '#', '@', ':', ','].contains(&c) => {
+                c if ['{', '}', '(', ')', ';', '.', '*', '/', '+', '-', '&', '%', '#', '@', ':', ',', '='].contains(&c) => {
                     if let Some(t) = self.generate_character_token() {
                         self.tokens.push(t);
                     }

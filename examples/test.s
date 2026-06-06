@@ -21,5 +21,5 @@ _start:
  mov qword [rbp-40], rax
  mov rdi, [rbp-40]
  call print_int
- mov rdi, 4
+ xor rdi, rdi
  call exit

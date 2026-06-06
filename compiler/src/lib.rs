@@ -69,6 +69,7 @@ impl Compiler {
                         self.emit(" call print_int");
                     }
                 },
+                Instruction::StoreVar { name, dst } => todo!(),
             }
         }
 

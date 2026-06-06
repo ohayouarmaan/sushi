@@ -30,7 +30,12 @@ pub enum Expression {
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expression(Expression),
-    PrintStatement(Expression)
+    PrintStatement(Expression),
+    VariableDeclaration {
+        name: Token,
+        var_type: TokenType,
+        value: Expression
+    }
 }
 
 #[derive(Debug)]
@@ -79,6 +84,20 @@ impl Parser {
         }
     }
 
+    fn consume_and_return(&mut self, tt: TokenType) -> Result<Token> {
+        if self.can_move_forward() {
+            if self.get_current_token().tt == tt {
+                let t = self.get_current_token().clone();
+                self.advance();
+                Ok(t)
+            } else {
+                Err(anyhow!("Expected {:?} found {:?}", tt, self.get_current_token()))
+            }
+        } else {
+            Err(anyhow!("Expected {:?} found EOF", tt))
+        }
+    }
+
     fn get_current_token(&self) -> &Token {
         &self.tokens[self.current_index]
     }
@@ -103,6 +122,9 @@ impl Parser {
                 let exp = self.parse_expression()?;
                 Ok(Statement::PrintStatement(exp))
             }
+            TokenType::Dec => {
+                self.parse_var_declaration()
+            }
             _ => {
                 match self.parse_expression() {
                     Ok(expression) => Ok(Statement::Expression(expression)),
@@ -112,10 +134,22 @@ impl Parser {
         }
     }
 
+    fn parse_var_declaration(&mut self) -> Result<Statement> {
+        self.advance();
+        let name_token = self.consume_and_return(TokenType::Identifier)?;
+        for dt in [TokenType::Int, TokenType::String] {
+            if let Ok(var_dt) = self.consume_and_return(dt) {
+                self.consume(TokenType::Equal)?;
+                let value = self.parse_expression()?;
+                self.consume(TokenType::SemiColon)?;
+                return Ok(Statement::VariableDeclaration { name: name_token, var_type: var_dt.tt, value });
+            }
+        }
+        Err(anyhow!("Expected a 'DataType' Token after variable declaration's name. {:?}:{:?}", name_token.line, name_token.column))
+    }
+
     fn parse_expression(&mut self) -> Result<Expression> {
-        let res = self.parse_term();
-        self.consume(TokenType::SemiColon)?;
-        res
+        self.parse_term()
     }
 
 
