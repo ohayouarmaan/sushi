@@ -1,6 +1,6 @@
 global _start
 extern print_int
-extern print_char
+extern exit
 section .text
 _start:
  push rbp
@@ -21,5 +21,5 @@ _start:
  mov qword [rbp-40], rax
  mov rdi, [rbp-40]
  call print_int
- xor rdi, rdi
+ mov rdi, 4
  call exit

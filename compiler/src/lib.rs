@@ -30,7 +30,7 @@ impl Compiler {
         let instructions = self.instructions.clone();
         self.emit("global _start");
         self.emit("extern print_int");
-        self.emit("extern print_char");
+        self.emit("extern exit");
         self.emit("section .text");
         self.emit("_start:");
         self.emit(" push rbp");
