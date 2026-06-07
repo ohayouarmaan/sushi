@@ -1,1 +1,2 @@
-dec x int = 123 + 234 + 999;
+dec x int = 2 + 3;
+print x;

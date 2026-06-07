@@ -6,13 +6,15 @@ use anyhow::{Result, anyhow};
 
 #[derive(Debug, Clone)]
 pub enum Literal {
-    NumberInt(u64)
+    NumberInt(u64),
+    Variable(String),
 }
 
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NumberInt(x) => write!(f, "{}", x)
+            Self::NumberInt(x) => write!(f, "{}", x),
+            Self::Variable(x) => write!(f, "var{{}}{}", x)
         }
     }
 }
@@ -55,7 +57,7 @@ impl Parser {
     }
 
     fn peek(&self) -> Option<&Token> {
-        if self.current_index < self.tokens.len() {
+        if self.current_index < self.tokens.len() - 1 {
             return Some(&self.tokens[self.current_index+1]);
         }
         None
@@ -104,7 +106,7 @@ impl Parser {
 
     pub fn parse(&mut self) -> Result<()> {
         let mut statments: Vec<Statement> = Vec::new();
-        if self.peek().is_some() {
+        while self.peek().is_some() {
             match self.parse_statement() {
                 Ok(t) => statments.push(t),
                 Err(e) => return Err(e)
@@ -164,6 +166,10 @@ impl Parser {
     fn parse_literal(&mut self) -> Result<Expression> {
         if self.get_current_token().tt == TokenType::NumberInt {
             let res = Ok(Expression::Literal(Literal::NumberInt(self.get_current_token().lexeme.parse()?)));
+            self.advance();
+            return res;
+        } else if self.get_current_token().tt == TokenType::Identifier {
+            let res = Ok(Expression::Literal(Literal::Variable(self.get_current_token().lexeme.parse()?)));
             self.advance();
             return res;
         };

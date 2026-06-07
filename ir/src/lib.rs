@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 use lexer::{Token, TokenType};
 use parser::{Literal, Statement, Expression};
 use anyhow::{Result, anyhow};
@@ -96,6 +96,10 @@ InstructionSet! {
     StoreVar {
         name: String,
         dst: Temp
+    },
+    LoadVar {
+        name: String,
+        dst: Temp
     }
 }
 
@@ -104,7 +108,8 @@ pub struct IRGenerator {
     pub statements: Vec<Statement>,
     pub current_position: usize,
     pub instructions: Vec<Instruction>,
-    pub temp_counter: usize
+    pub temp_counter: usize,
+    pub var_type_holder: HashMap<String, Type>
 }
 
 
@@ -114,22 +119,26 @@ impl IRGenerator {
             statements,
             current_position: 0,
             instructions: Vec::new(),
-            temp_counter: 0
+            temp_counter: 0,
+            var_type_holder: HashMap::new(),
         }
     }
 
-    // fn can_move(&self) -> bool {
-    //     self.current_position < self.statements.len()
-    // }
-    //
-    // fn advance(&mut self) {
-    //     if self.can_move() {
-    //         self.current_position += 1;
-    //     }
-    // }
+    fn can_move(&self) -> bool {
+        self.current_position < self.statements.len() - 1
+    }
 
-    fn get_current_statement(&self) -> &Statement {
-        &self.statements[self.current_position]
+    fn advance(&mut self) {
+        if self.can_move() {
+            self.current_position += 1;
+        }
+    }
+
+    fn get_current_statement(&self) -> Option<&Statement> {
+        if self.current_position < self.statements.len() {
+            return Some(&self.statements[self.current_position]);
+        }
+        None
     }
 
 
@@ -167,18 +176,40 @@ impl IRGenerator {
     }
 
     pub fn generate(&mut self) -> Result<()> {
-        let stmt = self.get_current_statement().clone();
-        match stmt {
-            Statement::Expression(e) => self.generate_expression(&e),
-            Statement::VariableDeclaration { name, var_type, value } => self.generate_var_declaration_statement(name, var_type, value),
-            Statement::PrintStatement(e) => self.generate_print_statement(&e),
+        while let Some(stmt) = self.get_current_statement() {
+            match stmt {
+                Statement::Expression(e) => {
+                    self.generate_expression(&e.clone())?;
+                }
+
+                Statement::VariableDeclaration {
+                    name,
+                    var_type,
+                    value,
+                } => {
+                    self.generate_var_declaration_statement(
+                        name.clone(),
+                        *var_type,
+                        value.clone(),
+                    )?;
+                }
+
+                Statement::PrintStatement(e) => {
+                    self.generate_print_statement(&e.clone())?;
+                }
+            }
+
+            self.current_position += 1;
         }
+
+        Ok(())
     }
 
     fn generate_var_declaration_statement(&mut self, name: Token, var_type: TokenType, value: Expression) -> Result<()> {
         let ty = self.token_type_to_type(var_type)?;
         let value = self.lower_expression(&value)?;
-        self.ensure_type(ty, value.1.clone(), None)?;
+        self.ensure_type(ty.clone(), value.1.clone(), None)?;
+        self.var_type_holder.insert(name.lexeme.clone(), ty);
         self.instructions.push(Instruction::StoreVar { name: name.lexeme, dst: value });
         Ok(())
     }
@@ -243,6 +274,12 @@ impl IRGenerator {
                         self.instructions.push(Instruction::LoadImmediate { literal: literal.clone(), dst: dst.clone() });
                         Ok(dst)
                     }
+                    Literal::Variable(var_name) => {
+                        let var_type = self.var_type_holder.get(var_name).ok_or(anyhow!("variable not found"))?;
+                        let dst = self.generate_new_temp(var_type.clone());
+                        self.instructions.push(Instruction::LoadVar { name: var_name.clone(), dst: dst.clone() });
+                        Ok(dst)
+                    },
                 }
             }
         }
