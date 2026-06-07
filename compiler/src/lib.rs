@@ -103,9 +103,90 @@ impl Compiler {
                     self.temp_stack_map.insert(dst.0, self.current_stack_ptr);
                     self.emit_label(current_label, "");
                 },
-                Instruction::Subtract { left, right, dst } => todo!(),
-                Instruction::Multiply { left, right, dst } => todo!(),
-                Instruction::Divide { left, right, dst } => todo!(),
+                Instruction::Subtract { left, right, dst } => {
+                    self.emit_label(current_label, "; Subtracting");
+                    let l_sp = *self.temp_stack_map
+                        .get(&left.0)
+                        .ok_or(anyhow!("Error while getting the left stack ptr"))?;
+                    let r_sp = *self.temp_stack_map
+                        .get(&right.0)
+                        .ok_or(anyhow!("Error while getting the right stack ptr"))?;
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov rax, [rbp-{l_sp}]")
+                    );
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov rcx, [rbp-{r_sp}]")
+                    );
+                    self.emit_label(current_label, " sub rax, rcx");
+                    self.current_stack_ptr += 8;
+                    self.emit_label(current_label, " sub rsp, 8");
+                    let csp = self.current_stack_ptr;
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov [rbp-{csp}], rax")
+                    );
+                    self.temp_stack_map.insert(dst.0, csp);
+                    self.emit_label(current_label, "");
+                },
+
+                Instruction::Multiply { left, right, dst } => {
+                    self.emit_label(current_label, "; Multiplying");
+                    let l_sp = *self.temp_stack_map
+                        .get(&left.0)
+                        .ok_or(anyhow!("Error while getting the left stack ptr"))?;
+                    let r_sp = *self.temp_stack_map
+                        .get(&right.0)
+                        .ok_or(anyhow!("Error while getting the right stack ptr"))?;
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov rax, [rbp-{l_sp}]")
+                    );
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov rcx, [rbp-{r_sp}]")
+                    );
+                    self.emit_label(current_label, " imul rax, rcx");
+                    self.current_stack_ptr += 8;
+                    self.emit_label(current_label, " sub rsp, 8");
+                    let csp = self.current_stack_ptr;
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov [rbp-{csp}], rax")
+                    );
+                    self.temp_stack_map.insert(dst.0, csp);
+                    self.emit_label(current_label, "");
+                },
+
+                Instruction::Divide { left, right, dst } => {
+                    self.emit_label(current_label, "; Dividing");
+                    let l_sp = *self.temp_stack_map
+                        .get(&left.0)
+                        .ok_or(anyhow!("Error while getting the left stack ptr"))?;
+                    let r_sp = *self.temp_stack_map
+                        .get(&right.0)
+                        .ok_or(anyhow!("Error while getting the right stack ptr"))?;
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov rax, [rbp-{l_sp}]")
+                    );
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov rcx, [rbp-{r_sp}]")
+                    );
+                    self.emit_label(current_label, " xor rdx, rdx");
+                    self.emit_label(current_label, " div rcx");
+                    self.current_stack_ptr += 8;
+                    self.emit_label(current_label, " sub rsp, 8");
+                    let csp = self.current_stack_ptr;
+                    self.emit_label(
+                        current_label,
+                        &format!(" mov [rbp-{csp}], rax")
+                    );
+                    self.temp_stack_map.insert(dst.0, csp);
+                    self.emit_label(current_label, "");
+                },
                 Instruction::Print { dst } => {
                     self.emit_label(current_label, " ; Printing");
                     if let Some(imm_sp) = self.temp_stack_map.get(&dst.0) {

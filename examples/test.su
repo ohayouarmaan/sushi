@@ -1,2 +1,3 @@
-dec x int = 2 + 3;
-print x;
+dec x int = 2 + 3 * 7 / 4;
+dec y int = x + 3 * 7 / 4;
+print y;
