@@ -64,6 +64,19 @@ impl Display for Temp {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct FunctionArgument {
+    pub name: String,
+    pub arg_type: Token
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: String,
+    pub arguments: Vec<FunctionArgument>,
+    pub body: Vec<Instruction>,
+    pub return_type: Token
+}
 
 InstructionSet! {
     LoadImmediate {
@@ -103,15 +116,16 @@ InstructionSet! {
     }
 }
 
+
 #[derive(Debug)]
 pub struct IRGenerator {
     pub statements: Vec<Statement>,
     pub current_position: usize,
     pub instructions: Vec<Instruction>,
     pub temp_counter: usize,
-    pub var_type_holder: HashMap<String, Type>
+    pub var_type_holder: HashMap<String, Type>,
+    pub functions: Vec<Function>
 }
-
 
 impl IRGenerator {
     pub fn new(statements: Vec<Statement>) -> Self {
@@ -121,18 +135,19 @@ impl IRGenerator {
             instructions: Vec::new(),
             temp_counter: 0,
             var_type_holder: HashMap::new(),
+            functions: Vec::new()
         }
     }
 
-    fn can_move(&self) -> bool {
-        self.current_position < self.statements.len() - 1
-    }
-
-    fn advance(&mut self) {
-        if self.can_move() {
-            self.current_position += 1;
-        }
-    }
+    // fn can_move(&self) -> bool {
+    //     self.current_position < self.statements.len()
+    // }
+    //
+    // fn advance(&mut self) {
+    //     if self.can_move() {
+    //         self.current_position += 1;
+    //     }
+    // }
 
     fn get_current_statement(&self) -> Option<&Statement> {
         if self.current_position < self.statements.len() {
@@ -176,91 +191,119 @@ impl IRGenerator {
     }
 
     pub fn generate(&mut self) -> Result<()> {
-        while let Some(stmt) = self.get_current_statement() {
-            match stmt {
-                Statement::Expression(e) => {
-                    self.generate_expression(&e.clone())?;
-                }
+        while let Some(stmt) = self.get_current_statement().cloned() {
+            let generated = self.generate_ir_from_statement(&stmt)?;
+            self.instructions.extend(generated);
+            self.current_position += 1;
+        }
+        Ok(())
+    }
 
-                Statement::VariableDeclaration {
-                    name,
-                    var_type,
-                    value,
-                } => {
-                    self.generate_var_declaration_statement(
+    fn generate_ir_from_statement(&mut self, stmt: &Statement) -> Result<Vec<Instruction>> {
+        match stmt {
+            Statement::Expression(e) => {
+                Ok(self.generate_expression(&e.clone())?)
+            }
+            Statement::VariableDeclaration {
+                name,
+                var_type,
+                value,
+            } => {
+                Ok(self.generate_var_declaration_statement(
                         name.clone(),
                         *var_type,
                         value.clone(),
-                    )?;
-                }
-
-                Statement::PrintStatement(e) => {
-                    self.generate_print_statement(&e.clone())?;
-                }
+                )?)
             }
+            Statement::PrintStatement(e) => {
+                let insts = self.generate_print_statement(&e.clone())?;
+                dbg!(&insts);
+                Ok(insts)
+            }
+            Statement::FunctionDeclaration { name, arguments, return_type, body } => {
+                let mut insts = vec![];
+                let mut parsed_args: Vec<FunctionArgument> = vec![];
+                dbg!(&name);
+                for arg in arguments {
+                    parsed_args.push(FunctionArgument { name: arg.0.clone(), arg_type: arg.1.clone() });
+                }
+                dbg!(&parsed_args);
+                for stmt in body {
+                    let instructions = self.generate_ir_from_statement(stmt)?;
+                    insts.extend(instructions);
+                }
+                let f = Function { name: name.lexeme.clone(), arguments: parsed_args, body: insts, return_type: return_type.clone() };
+                dbg!(&f);
 
-            self.current_position += 1;
+                self.functions.push(f);
+                Ok(vec![])
+            },
         }
-
-        Ok(())
     }
 
-    fn generate_var_declaration_statement(&mut self, name: Token, var_type: TokenType, value: Expression) -> Result<()> {
+    fn generate_var_declaration_statement(&mut self, name: Token, var_type: TokenType, value: Expression) -> Result<Vec<Instruction>> {
         let ty = self.token_type_to_type(var_type)?;
-        let value = self.lower_expression(&value)?;
-        self.ensure_type(ty.clone(), value.1.clone(), None)?;
-        self.var_type_holder.insert(name.lexeme.clone(), ty);
-        self.instructions.push(Instruction::StoreVar { name: name.lexeme, dst: value });
-        Ok(())
+        let mut insts = vec![]; 
+        let lowered_expr = self.lower_expression(&value)?;
+        insts.extend(lowered_expr.0.clone());
+        insts.push(Instruction::StoreVar { name: name.lexeme.clone(), dst: lowered_expr.1.clone() });
+        self.ensure_type(ty.clone(), lowered_expr.1.1.clone(), None)?;
+        self.var_type_holder.insert(name.lexeme.to_string(), ty);
+        Ok(insts)
     }
 
-    fn generate_expression(&mut self, e: &Expression) -> Result<()> {
-        self.lower_expression(e)?;
-        Ok(())
+    fn generate_expression(&mut self, e: &Expression) -> Result<Vec<Instruction>> {
+        let lowered = self.lower_expression(e)?;
+        Ok(lowered.0)
     }
 
-    fn generate_print_statement(&mut self, e: &Expression) -> Result<()> {
+    fn generate_print_statement(&mut self, e: &Expression) -> Result<Vec<Instruction>> {
         let lowered_expr = self.lower_expression(e)?;
-        self.instructions.push(Instruction::Print { dst: lowered_expr });
-        Ok(())
+        let mut insts: Vec<Instruction> = vec![];
+        insts.extend(lowered_expr.0);
+        insts.push(Instruction::Print { dst: lowered_expr.1 });
+        Ok(insts)
     }
 
 
-    fn lower_expression(&mut self, e: &Expression) -> Result<Temp> {
+    fn lower_expression(&mut self, e: &Expression) -> Result<(Vec<Instruction>, Temp)> {
+        let mut insts: Vec<Instruction> = vec![];
         match e {
             parser::Expression::Binary { left, operator, right } => {
                 let left = self.lower_expression(left)?;
+                insts.extend(left.0);
                 let right = self.lower_expression(right)?;
+                insts.extend(right.0);
                 match operator.tt {
                     TokenType::Plus => {
-                        if let Ok(resolved_type) = self.resolve_types_binary_expr(left.1.clone(), right.1.clone()) {
+                        if let Ok(resolved_type) = self.resolve_types_binary_expr(left.1.1.clone(), right.1.1.clone()) {
                             let dst = self.generate_new_temp(resolved_type);
-                            self.instructions.push(Instruction::Add { left, right, dst: dst.clone() });
-                            Ok(dst)
+                            insts.push(Instruction::Add { left: left.1, right: right.1, dst: dst.clone() });
+                            return Ok((insts, dst));
                         } else {
                             Err(anyhow!("Can not resolve {:?} and {:?}", left.1, right.1))
                         }
                     },
                     TokenType::Star => {
-                        self.ensure_type(left.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
-                        self.ensure_type(right.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
+                        self.ensure_type(left.1.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
+                        self.ensure_type(right.1.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
                         let dst = self.generate_new_temp(Type::I64);
-                        self.instructions.push(Instruction::Multiply { left, right, dst: dst.clone() });
-                        Ok(dst)
+                        insts.push(Instruction::Multiply { left: left.1, right: right.1, dst: dst.clone() });
+                        Ok((insts, dst))
                     },
                     TokenType::Slash => {
-                        self.ensure_type(left.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
-                        self.ensure_type(right.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
+                        self.ensure_type(left.1.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
+                        self.ensure_type(right.1.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
                         let dst = self.generate_new_temp(Type::I64);
-                        self.instructions.push(Instruction::Divide { left, right, dst: dst.clone() });
-                        Ok(dst)
+                        insts.push(Instruction::Divide { left: left.1, right: right.1, dst: dst.clone() });
+                        Ok((insts, dst))
                     },
                     TokenType::Minus => {
-                        self.ensure_type(left.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
-                        self.ensure_type(right.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
+                        self.ensure_type(left.1.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
+                        self.ensure_type(right.1.1.clone(), Type::I64, Some((operator.line, operator.column)))?;
                         let dst = self.generate_new_temp(Type::I64);
-                        self.instructions.push(Instruction::Subtract { left, right, dst: dst.clone() });
-                        Ok(dst)
+                        insts.push(Instruction::Subtract { left: left.1, right: right.1, dst: dst.clone() });
+                        Ok((insts, dst))
                     },
                     _ => {
                         todo!("operator {:?} not implemented yet", operator.tt);
@@ -271,14 +314,21 @@ impl IRGenerator {
                 match literal {
                     Literal::NumberInt(_) => {
                         let dst = self.generate_new_temp(Type::I64);
-                        self.instructions.push(Instruction::LoadImmediate { literal: literal.clone(), dst: dst.clone() });
-                        Ok(dst)
+                        insts.push(Instruction::LoadImmediate { literal: literal.clone(), dst: dst.clone() });
+                        Ok((insts, dst))
                     }
                     Literal::Variable(var_name) => {
-                        let var_type = self.var_type_holder.get(var_name).ok_or(anyhow!("variable not found"))?;
-                        let dst = self.generate_new_temp(var_type.clone());
-                        self.instructions.push(Instruction::LoadVar { name: var_name.clone(), dst: dst.clone() });
-                        Ok(dst)
+                        let var_type = self.var_type_holder.get(var_name).ok_or(anyhow!("variable {var_name} not found"));
+                        match var_type {
+                            Ok(c) => {
+                                let dst = self.generate_new_temp(c.clone());
+                                insts.push(Instruction::LoadVar { name: var_name.clone(), dst: dst.clone() });
+                                Ok((insts, dst))
+                            },
+                            Err(e) => {
+                                Err(e)
+                            },
+                        }
                     },
                 }
             }

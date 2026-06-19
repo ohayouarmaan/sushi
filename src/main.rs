@@ -26,9 +26,8 @@ fn main() -> Result<()> {
     let mut p = Parser::new(l.tokens);
     match p.parse() {
         Ok(()) => {
-            dbg!(&p.statements);
             let mut ir = IRGenerator::new(p.statements.expect("UNREACHABLE"));
-            let _ = ir.generate();
+            ir.generate()?;
             let mut insts = String::new();
             for instr in ir.instructions.iter().clone() {
                 println!("{instr}");
@@ -36,7 +35,7 @@ fn main() -> Result<()> {
                 insts.push('\n');
             }
 
-            let mut c = compiler::Compiler::new(ir.instructions);
+            let mut c = compiler::Compiler::new(ir.instructions, ir.functions);
             let _ = c.compile();
             let assembly = c.build();
             let _ = fs::write("./examples/test.s", assembly);

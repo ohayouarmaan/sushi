@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use lexer::{Token, TokenType};
 use anyhow::{Result, anyhow};
@@ -26,7 +26,10 @@ pub enum Expression {
         operator: Token,
         right: Box<Expression>
     },
-    Literal(Literal)
+    Literal {
+        value: Literal,
+        token: Token
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +40,12 @@ pub enum Statement {
         name: Token,
         var_type: TokenType,
         value: Expression
+    },
+    FunctionDeclaration {
+        name: Token,
+        arguments: HashMap<String, Token>,
+        return_type: Token,
+        body: Vec<Box<Statement>>
     }
 }
 
@@ -122,10 +131,14 @@ impl Parser {
             TokenType::Print => {
                 self.advance();
                 let exp = self.parse_expression()?;
+                self.consume(TokenType::SemiColon)?;
                 Ok(Statement::PrintStatement(exp))
             }
             TokenType::Dec => {
                 self.parse_var_declaration()
+            }
+            TokenType::At => {
+                self.parse_function_declaration()
             }
             _ => {
                 match self.parse_expression() {
@@ -134,6 +147,36 @@ impl Parser {
                 }
             }
         }
+    }
+
+    fn parse_function_declaration(&mut self) -> Result<Statement> {
+        self.consume(TokenType::At)?;
+        let name = self.consume_and_return(TokenType::Identifier)?;
+        self.consume(TokenType::LParen)?;
+        let mut args: HashMap<String, Token> = HashMap::new();
+        while self.consume_and_return(TokenType::RParen).is_err() {
+            let arg_name = self.consume_and_return(TokenType::Identifier)?;
+            let arg_type = self.get_current_token().clone();
+            self.advance();
+            if self.get_current_token().tt != TokenType::Comma && self.get_current_token().tt != TokenType::RParen {
+                return Err(anyhow!("Either expected a comma or a closing paren {}:{}", 
+                        self.get_current_token().line, self.get_current_token().column))
+            }
+            let _ = self.consume_and_return(TokenType::Comma);
+            args.insert(arg_name.lexeme, arg_type);
+        }
+        
+        let return_token = self.get_current_token().clone();
+        self.advance();
+        self.consume(TokenType::LBrace)?;
+        let mut stmts: Vec<Box<Statement>> = Vec::new();
+
+        while self.consume_and_return(TokenType::RBrace).is_err() {
+            let stmt = self.parse_statement()?;
+            stmts.push(Box::new(stmt));
+        }
+
+        Ok(Statement::FunctionDeclaration { name, arguments: args, return_type: return_token, body: stmts })
     }
 
     fn parse_var_declaration(&mut self) -> Result<Statement> {
@@ -165,7 +208,10 @@ impl Parser {
 
     fn parse_literal(&mut self) -> Result<Expression> {
         if self.get_current_token().tt == TokenType::NumberInt {
-            let res = Ok(Expression::Literal(Literal::NumberInt(self.get_current_token().lexeme.parse()?)));
+            let res = Ok(Expression::Literal
+                    { value: Literal::NumberInt(self.get_current_token().lexeme.parse()?),
+                      token: self.get_current_token().clone()
+                    });
             self.advance();
             return res;
         } else if self.get_current_token().tt == TokenType::Identifier {

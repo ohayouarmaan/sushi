@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use anyhow::{Result, anyhow};
 
-use ir::Instruction;
+use ir::{Function, Instruction};
 use parser::{Expression, Literal};
 
 pub struct Label(HashMap<String, Vec<String>>);
-
 pub struct Header(Vec<String>);
 pub struct Text(Vec<String>);
 pub struct Data(Vec<String>);
@@ -20,11 +19,12 @@ pub struct Compiler {
     pub bss: Bss,
     pub temp_stack_map: HashMap<usize, usize>,
     pub variables: HashMap<String, usize>,
-    pub current_stack_ptr: usize
+    pub current_stack_ptr: usize,
+    pub functions: Vec<Function>
 }
 
 impl Compiler {
-    pub fn new(instructions: Vec<Instruction>) -> Self {
+    pub fn new(instructions: Vec<Instruction>, functions: Vec<Function>) -> Self {
         Self {
             instructions,
             temp_stack_map: HashMap::new(),
@@ -35,6 +35,7 @@ impl Compiler {
             text: Text(Vec::new()),
             data: Data(Vec::new()),
             bss: Bss(Vec::new()),
+            functions
         }
     }
 
@@ -62,7 +63,6 @@ impl Compiler {
     }
 
     pub fn compile(&mut self) -> Result<()> {
-        let instructions = self.instructions.clone();
         self.emit_header("global _start");
         self.emit_header("extern print_int");
         self.emit_header("extern exit");
@@ -71,8 +71,15 @@ impl Compiler {
 
         self.emit_label("_start", " push rbp");
         self.emit_label("_start", " mov rbp, rsp");
+        for fx in self.functions.clone() {
+            self._compile_function(&fx.name, fx.body)?;
+        }
+        self.emit_label("_start", " xor rdi, rdi");
+        self.emit_label("_start", " call exit");
+        Ok(())
+    }
 
-        let current_label = "_start";
+    fn _compile_function(&mut self, current_label: &str, instructions: Vec<Instruction>) -> Result<()> {
         for instruction in instructions {
             match instruction {
                 Instruction::LoadImmediate { literal, dst } => {
@@ -196,7 +203,6 @@ impl Compiler {
                     self.emit_label(current_label, "");
                 },
                 Instruction::StoreVar { name, dst } => {
-                    self.emit_label(current_label, " ; Storing variable");
                     let stack_offset = self.temp_stack_map.get(&dst.0.clone()).ok_or(anyhow!("Invalid stack offset"))?;
                     self.variables.insert(name, *stack_offset);
                     dbg!(&self.variables);
@@ -224,8 +230,6 @@ impl Compiler {
             }
         }
 
-        self.emit_label(current_label, " xor rdi, rdi");
-        self.emit_label(current_label, " call exit");
         Ok(())
     }
 
@@ -263,8 +267,8 @@ impl Compiler {
             output.push_str(&format!("{label}:\n"));
 
             for line in body {
-                println!("{}", line);
-                output.push_str(line);
+                println!("\t{}", line);
+                output.push_str(&format!("\t{}", line));
                 output.push('\n');
             }
 
