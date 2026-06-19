@@ -110,6 +110,7 @@ impl Lexer {
         let lexeme_end = self.current_position;
         match current_character {
             '{' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LBrace, lexeme: "{".into(), column: self.current_column, line: self.current_row }),
+            '@' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::At, lexeme: "@".into(), column: self.current_column, line: self.current_row }),
             '}' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RBrace, lexeme: "}".into(), column: self.current_column, line: self.current_row }),
             '(' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::LParen, lexeme: "(".into(), column: self.current_column, line: self.current_row }),
             ')' => Some(Token { lexeme_end, lexeme_start, tt: TokenType::RParen, lexeme: ")".into(), column: self.current_column, line: self.current_row }),
